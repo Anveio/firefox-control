@@ -4,7 +4,7 @@ A small local CLI, native-messaging companion, and Firefox extension for program
 
 Requires Firefox **153+** and Node.js **22+** on macOS or Linux. Windows is not supported by the companion installer.
 
-Current components: companion **0.1.1**, extension **0.1.0**. [Download the latest release](https://github.com/Anveio/firefox-control/releases/latest). The extension has been submitted for public Mozilla review; a signed build is pending. Until signing completes, development installation uses `about:debugging` → Load Temporary Add-on → `extension/manifest.json` and lasts until Firefox restarts.
+Current components: companion **0.2.0**, extension **0.2.0**. [Download the latest release](https://github.com/Anveio/firefox-control/releases/latest). Extension 0.1.0 was submitted for public Mozilla review; 0.2.0 adds development reload support and is available as a source/development release. Until signing completes, development installation uses `about:debugging` → Load Temporary Add-on → `extension/manifest.json` and lasts until Firefox restarts.
 
 ## Install
 
@@ -65,3 +65,18 @@ npx web-ext run --source-dir extension
 The extension is plain, readable JavaScript copied unchanged into a ZIP. There is no transpilation or minification. The native companion has no npm dependencies. `web-ext` is development-only. The minimal Codex skill is in `skill/firefox-control/SKILL.md`.
 
 Uninstall: remove the extension, `~/.local/bin/firefox-control`, `~/.local/share/firefox-control`, and `com.anveio.firefox_control.json` from macOS `~/Library/Application Support/Mozilla/NativeMessagingHosts/` or Linux `~/.mozilla/native-messaging-hosts/`.
+
+## One-command development reload
+
+After rebuilding an opted-in extension:
+
+```sh
+firefox-control extensions reload socialultra-feed@anveio.local --expect-version 1.0.83
+firefox-control extensions reload self --expect-version 0.2.0
+```
+
+The command pins the selected Firefox profile, requests one reload, and waits for a new background instance with the matching request ID. It reports the version actually loaded, and fails if `--expect-version` differs. It does not build source or refresh website tabs. If a command times out, inspect before retrying; the reload request is never automatically resent.
+
+To opt another local extension in, copy `extension/reload.js` into that extension, include it in its background scripts, and give it `storage` permission. Load it once using Firefox's development tools. The handler accepts only the exact Firefox Control extension ID and only status/reload commands. It exposes no page data or script-execution facility. This uses Firefox's public runtime messaging/reload APIs; it does not open a debugger port, change browser preferences, or manage arbitrary third-party extensions. Remove the handler from an extension to remove its opt-in.
+
+Verified in Firefox 159: a CLI reload of the temporary SocialUltra extension read its rebuilt files and changed its loaded manifest version from 1.0.82 to 1.0.83. Self-reload also reconnected successfully. Signed installations reload their installed package; they do not read this source checkout.

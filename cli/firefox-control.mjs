@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {ROOT,privateDir,host,profiles,request} from './transport.mjs';
 const HELP=`firefox-control — local Firefox automation (JSON output; Node 22+, Firefox 153+)
@@ -11,6 +12,16 @@ Setup:
   firefox-control profiles            List connected profile IDs, names, versions
   firefox-control status [--profile ID]
   firefox-control profile rename NAME [--profile ID]
+
+Local extension development:
+  firefox-control extensions info ID|self
+  firefox-control extensions reload ID|self [--expect-version VERSION]
+  Rebuild first. Reload waits for a new background instance and matching request ID.
+  Other extensions must include the packaged reload.js handler and storage permission;
+  load/reload the handler once manually. No debugger port or Firefox settings changes.
+  Reloading a temporary extension reads its development files; signed extensions use
+  their installed package. This does not build sources, sign/install an update, or
+  reload website tabs. Reload affected tabs afterward if their content scripts changed.
 
 Browser (PROPS and QUERY are JSON objects, matching Firefox WebExtension APIs):
   firefox-control windows list [QUERY]
@@ -80,7 +91,7 @@ async function install(){
   return {installed:true,command:path.join(bin,'firefox-control'),nativeManifest:path.join(manifestDir,'com.anveio.firefox_control.json'),next:'Install the extension and click its toolbar icon to enable local control.'};
 }
 export async function main(argv){
-  const args=[],opts={};const flags=new Set(['stdin','all-frames']);const valued=new Set(['profile','frame','limit','timeout','file','world','out','selector']);
+  const args=[],opts={};const flags=new Set(['stdin','all-frames']);const valued=new Set(['profile','frame','limit','timeout','file','world','out','selector','expect-version']);
   for(let i=0;i<argv.length;i++){const value=argv[i];if(value.startsWith('--')){const name=value.slice(2);if(name==='help'){console.log(HELP);return;}if(flags.has(name))opts[name]=true;else if(valued.has(name)){if(argv[i+1]===undefined)throw new Error('Missing value for '+value);opts[name]=argv[++i];}else throw new Error('Unknown option '+value);}else args.push(value);}
   const [cmd,sub,...rest]=args;
   if(!cmd || cmd==='help'){console.log(HELP);return;}
@@ -92,6 +103,29 @@ export async function main(argv){
   if(cmd==='profile' && sub==='rename')return send('profile.rename',{name:rest[0]});
   if(cmd==='rpc')return send(sub,json(rest[0]));
   if(cmd==='containers')return send('containers.list');
+  if(cmd==='extensions'){
+    if(!['info','reload'].includes(sub) || !rest[0])throw new Error('Use extensions info|reload ID|self');
+    const selected=(await profiles()).filter(p=>!opts.profile || p.profileId===opts.profile || p.name===opts.profile);
+    if(selected.length!==1)throw new Error('Select exactly one connected Firefox profile with --profile');
+    const profile=selected[0].profileId, id=rest[0];
+    const rpc=(method,params)=>request(method,params,profile,{timeoutMs:2000});
+    const before=await rpc('extensions.info',{id});
+    if(sub==='info')return before;
+    const reloadId=crypto.randomUUID();
+    let acknowledgement;
+    try {acknowledgement=await rpc('extensions.reload',{id,reloadId});}
+    catch(error){acknowledgement={error:error.message};} // Never resend an uncertain mutation.
+    const deadline=Date.now()+15000;
+    while(Date.now()<deadline){
+      await new Promise(r=>setTimeout(r,200));
+      let after;try{after=await rpc('extensions.info',{id});}catch{continue;}
+      if(after.bootId!==before.bootId && after.reloadId===reloadId){
+        if(opts['expect-version'] && after.version!==opts['expect-version'])throw new Error(`Reloaded ${id}, but expected version ${opts['expect-version']} and found ${after.version}`);
+        return {reloaded:true,id:after.id,name:after.name,version:after.version,previousVersion:before.version,profileId:profile,bootId:after.bootId,previousBootId:before.bootId,reloadId};
+      }
+    }
+    throw new Error(`Reload not verified for ${id}; inspect before retrying. ${acknowledgement?.error || ''}`);
+  }
   if(cmd==='windows' || cmd==='tabs'){
     const id=cmd==='windows'?'windowId':'tabId',action=sub==='delete'?'remove':sub;
     if(['list','create'].includes(action))return send(cmd+'.'+action,json(rest[0]));

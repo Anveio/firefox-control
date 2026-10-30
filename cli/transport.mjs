@@ -65,13 +65,13 @@ export async function profiles(){
     }catch{/* Ignore stale or inaccessible sessions; never unlink another live host's socket. */}
   }return results;
 }
-export async function request(method,params={},profile){
+export async function request(method,params={},profile,{timeoutMs=32000}={}){
   const available=await profiles();
   const matches=profile?available.filter(p=>p.profileId===profile || p.name===profile):available;
   if(matches.length!==1)throw new Error(matches.length?'Multiple Firefox sessions match; use --profile with an exact profile ID.':'No connected Firefox profile. Install the companion and extension, then click its toolbar icon.');
   return new Promise((resolve,reject)=>{
     const socket=net.connect(matches[0].socket);socket.setEncoding('utf8');let input='';
-    socket.setTimeout(32000,()=>{socket.destroy();reject(new Error('Firefox command timed out; outcome may be unknown.'));});
+    socket.setTimeout(timeoutMs,()=>{socket.destroy();reject(new Error('Firefox command timed out; outcome may be unknown.'));});
     socket.on('connect',()=>socket.write(JSON.stringify({method,params})+'\n'));
     socket.on('data',chunk=>{input+=chunk;if(Buffer.byteLength(input)>MAX){socket.destroy();reject(new Error('Response too large'));return;}if(!input.includes('\n'))return;
       socket.end();try{const value=JSON.parse(input.slice(0,input.indexOf('\n')));if(value.error)reject(new Error(value.error.message));else resolve(value.result);}catch(error){reject(error);}

@@ -68,6 +68,16 @@ async function dispatch(method,p){
   if(!config.enabled)throw new Error('Local control is paused');
   switch(method){
     case 'status':return status();
+    case 'extensions.info':case 'extensions.reload':{
+      const id=p.id === 'self' ? browser.runtime.id : p.id;
+      if(typeof id!=='string' || !id || id.length>255)throw new Error('Provide an extension ID or self');
+      const message={protocol:'firefox-control-reload-v1',action:method==='extensions.info'?'info':'reload',reloadId:p.reloadId};
+      if(id===browser.runtime.id)return handleControlReload(message);
+      let result;
+      try {result=await browser.runtime.sendMessage(id,message);}catch(error){throw new Error(`Cannot contact ${id}: install the development reload handler and reload it once. ${error.message}`);}
+      if(result?.protocol!==message.protocol || result?.id!==id)throw new Error(`${id} does not support the development reload protocol`);
+      return result;
+    }
     case 'profile.rename':config.profileName=String(p.name).slice(0,80);await browser.storage.local.set({profileName:config.profileName});port.postMessage({type:'hello',profileId:config.profileId,name:config.profileName,version:browser.runtime.getManifest().version});return status();
     case 'windows.list':return browser.windows.getAll({populate:!!p.populate});
     case 'windows.create':return browser.windows.create(p);
