@@ -1,0 +1,4 @@
+node_modules/
+artifacts/*
+!artifacts/.gitkeep
+.DS_Store

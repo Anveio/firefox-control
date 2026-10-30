@@ -1,0 +1,11 @@
+import {execFileSync} from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+const root=path.resolve(import.meta.dirname,'..');
+const {version}=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
+const manifest=JSON.parse(await fs.readFile(path.join(root,'extension/manifest.json'),'utf8'));
+if(manifest.version!==version)throw new Error('Manifest/package versions differ');
+await fs.mkdir(path.join(root,'artifacts'),{recursive:true});
+const output=path.join(root,`artifacts/firefox-control-${version}.zip`);await fs.rm(output,{force:true});
+execFileSync('zip',['-q','-r',output,'.'],{cwd:path.join(root,'extension')});
+console.log(output);
