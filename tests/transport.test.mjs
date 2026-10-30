@@ -27,5 +27,6 @@ test('real native host routes concurrent clients and cleans up',async()=>{
   assert.ok(meta,stderr);assert.equal((await fs.stat(path.join(dir,'run'))).mode&0o777,0o700);assert.equal((await fs.stat(meta.socket)).mode&0o777,0o600);
   const send=n=>new Promise((resolve,reject)=>{const socket=net.connect(meta.socket);let data='';socket.on('connect',()=>socket.write(JSON.stringify({method:'status',params:{n}})+'\n'));socket.on('data',x=>data+=x);socket.on('end',()=>resolve(JSON.parse(data)));socket.on('error',reject);});
   const values=await Promise.all([send(1),send(2),send(3)]);assert.deepEqual(values.map(x=>x.result.n),[1,2,3]);assert.equal(new Set(requests.map(x=>x.id)).size,3);
+  const unicode=await new Promise((resolve,reject)=>{const socket=net.connect(meta.socket);socket.setNoDelay(true);socket.setEncoding('utf8');let data='';socket.on('connect',async()=>{for(const byte of Buffer.from(JSON.stringify({method:'echo',params:{text:'বাংলা 😺'}})+'\n')){socket.write(Buffer.from([byte]));await new Promise(r=>setTimeout(r,1));}});socket.on('data',x=>data+=x);socket.on('end',()=>resolve(JSON.parse(data)));socket.on('error',reject);});assert.equal(unicode.result.text,'বাংলা 😺');
  }finally{proc.stdin.end();if(proc.exitCode===null)await new Promise(resolve=>proc.on('exit',resolve));await fs.rm(dir,{recursive:true,force:true});}
 });

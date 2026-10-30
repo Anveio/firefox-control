@@ -31,7 +31,7 @@ export async function host(){
         socketPath=path.join(RUNTIME,`${profileId}-${process.pid}.sock`);metaPath=socketPath+'.json';
         if(Buffer.byteLength(socketPath)>100)throw new Error('Socket path too long; use a shorter FIREFOX_CONTROL_HOME');
         server=net.createServer(client=>{
-          clients.add(client);client.setTimeout(35000,()=>client.destroy());let input='';let used=false;
+          client.setEncoding('utf8');clients.add(client);client.setTimeout(35000,()=>client.destroy());let input='';let used=false;
           client.on('data',chunk=>{
             input+=chunk.toString();if(Buffer.byteLength(input)>MAX){client.destroy();return;}
             if(used || !input.includes('\n'))return;used=true;
@@ -70,7 +70,7 @@ export async function request(method,params={},profile){
   const matches=profile?available.filter(p=>p.profileId===profile || p.name===profile):available;
   if(matches.length!==1)throw new Error(matches.length?'Multiple Firefox sessions match; use --profile with an exact profile ID.':'No connected Firefox profile. Install the companion and extension, then click its toolbar icon.');
   return new Promise((resolve,reject)=>{
-    const socket=net.connect(matches[0].socket);let input='';
+    const socket=net.connect(matches[0].socket);socket.setEncoding('utf8');let input='';
     socket.setTimeout(32000,()=>{socket.destroy();reject(new Error('Firefox command timed out; outcome may be unknown.'));});
     socket.on('connect',()=>socket.write(JSON.stringify({method,params})+'\n'));
     socket.on('data',chunk=>{input+=chunk;if(Buffer.byteLength(input)>MAX){socket.destroy();reject(new Error('Response too large'));return;}if(!input.includes('\n'))return;

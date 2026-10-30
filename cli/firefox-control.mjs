@@ -110,7 +110,7 @@ export async function main(argv){
   const tabId=number(sub,'tab');
   if(cmd==='frames')return send('frames.list',{tabId});
   if(cmd==='eval'){
-    const code=opts.file?await fs.readFile(opts.file,'utf8'):opts.stdin?await (async()=>{let text='';for await(const chunk of process.stdin)text+=chunk;return text;})():rest[0];
+    const code=opts.file?await fs.readFile(opts.file,'utf8'):opts.stdin?await (async()=>{process.stdin.setEncoding('utf8');let text='';for await(const chunk of process.stdin)text+=chunk;return text;})():rest[0];
     return send('eval',{tabId,code,world:opts.world || 'MAIN',...frame});
   }
   if(cmd==='screenshot'){

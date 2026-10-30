@@ -4,6 +4,8 @@ A small local CLI, native-messaging companion, and Firefox extension for program
 
 Requires Firefox **153+** and Node.js **22+** on macOS or Linux. Windows is not supported by the companion installer.
 
+Current components: companion **0.1.1**, extension **0.1.0**. [Download the latest release](https://github.com/Anveio/firefox-control/releases/latest). The extension has been submitted for public Mozilla review; a signed build is pending. Until signing completes, development installation uses `about:debugging` → Load Temporary Add-on → `extension/manifest.json` and lasts until Firefox restarts.
+
 ## Install
 
 1. Download and unpack the companion release, or clone this repository.
